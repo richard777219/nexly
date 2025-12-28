@@ -1,0 +1,53 @@
+import NextAuth from "next-auth";
+import GoogleProvider from "next-auth/providers/google";
+import { prisma } from "@/lib/prisma";
+
+const handler = NextAuth({
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+    }),
+  ],
+  session: { strategy: "jwt" },
+  callbacks: {
+    async signIn({ user, account }) {
+      if (!account || account.provider !== "google") return false;
+      const email = user.email ?? "";
+      if (!email) return false;
+
+      const dbUser = await prisma.user.upsert({
+        where: { email },
+        update: {
+          name: user.name ?? undefined,
+          image: user.image ?? undefined,
+          googleId: account.providerAccountId,
+        },
+        create: {
+          email,
+          name: user.name ?? undefined,
+          image: user.image ?? undefined,
+          googleId: account.providerAccountId,
+          wallet: { create: { balance: 0 } },
+        },
+        include: { wallet: true },
+      });
+
+      const alreadyGranted = await prisma.creditTransaction.findFirst({
+        where: { userId: dbUser.id, type: "FREE_GRANT" },
+        select: { id: true },
+      });
+
+      if (!alreadyGranted) {
+        await prisma.$transaction([
+          prisma.creditTransaction.create({ data: { userId: dbUser.id, type: "FREE_GRANT", amount: 1000 } }),
+          prisma.creditWallet.update({ where: { userId: dbUser.id }, data: { balance: { increment: 1000 } } }),
+        ]);
+      }
+
+      return true;
+    },
+  },
+});
+
+export { handler as GET, handler as POST };

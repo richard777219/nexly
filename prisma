@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  DRAFT
+  GENERATING
+  READY
+  ERROR
+}
+
+enum CreditTxType {
+  FREE_GRANT
+  USAGE
+  PURCHASE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String?  @unique
+  image     String?
+  googleId  String?  @unique
+  createdAt DateTime @default(now())
+
+  wallet    CreditWallet?
+  projects  Project[]
+  payments  Payment[]
+  txs       CreditTransaction[]
+}
+
+model CreditWallet {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model CreditTransaction {
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      CreditTxType
+  amount    Int
+  projectId String?
+  createdAt DateTime    @default(now())
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String
+  status      ProjectStatus @default(DRAFT)
+
+  messages    ProjectMessage[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ProjectMessage {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  role        String
+  content     String
+  creditsUsed Int      @default(0)
+
+  createdAt DateTime @default(now())
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider       String        @default("SUNIZE")
+  status         PaymentStatus @default(PENDING)
+  creditsGranted Int           @default(100000)
+
+  externalRef    String?
+  createdAt      DateTime      @default(now())
+}

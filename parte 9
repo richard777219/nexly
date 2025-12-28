@@ -1,0 +1,40 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { prisma } from "@/lib/prisma";
+
+export async function GET() {
+  const session = await getServerSession();
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+
+  const projects = await prisma.project.findMany({
+    where: { userId: user.id },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true, title: true, status: true, createdAt: true, updatedAt: true },
+  });
+
+  return NextResponse.json({ projects });
+}
+
+export async function POST(req: Request) {
+  const session = await getServerSession();
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+
+  const body = await req.json();
+  const title = String(body?.title ?? "Novo projeto");
+  const description = String(body?.description ?? "");
+
+  const project = await prisma.project.create({
+    data: { userId: user.id, title, description, status: "DRAFT" },
+    select: { id: true },
+  });
+
+  return NextResponse.json({ id: project.id });
+}

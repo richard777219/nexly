@@ -1,0 +1,23 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { prisma } from "@/lib/prisma";
+import { getIsPro } from "@/lib/credits";
+
+export async function GET() {
+  const session = await getServerSession();
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+
+  const user = await prisma.user.findUnique({ where: { email }, include: { wallet: true } });
+  if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+
+  const isPro = await getIsPro(user.id);
+
+  return NextResponse.json({
+    user: { id: user.id, name: user.name, email: user.email, image: user.image },
+    credits: user.wallet?.balance ?? 0,
+    isPro,
+    checkoutUrl: process.env.NEXLY_CHECKOUT_URL,
+    adminEmail: process.env.ADMIN_EMAIL,
+  });
+}

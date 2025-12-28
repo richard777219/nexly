@@ -1,0 +1,35 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { prisma } from "@/lib/prisma";
+import { grantPurchaseCredits } from "@/lib/credits";
+
+export async function POST(req: Request) {
+  const session = await getServerSession();
+  const callerEmail = session?.user?.email?.toLowerCase();
+
+  const adminEmail = (process.env.ADMIN_EMAIL ?? "").toLowerCase();
+  if (!callerEmail || !adminEmail || callerEmail !== adminEmail) {
+    return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const targetEmail = String(body?.email ?? "").trim().toLowerCase();
+  const externalRef = body?.externalRef ? String(body.externalRef) : undefined;
+
+  if (!targetEmail) return NextResponse.json({ error: "MISSING_EMAIL" }, { status: 400 });
+
+  const user = await prisma.user.findUnique({ where: { email: targetEmail } });
+  if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+
+  if (externalRef) {
+    const already = await prisma.payment.findFirst({
+      where: { externalRef, status: "PAID" },
+      select: { id: true }
+    });
+    if (already) return NextResponse.json({ ok: true, message: "Já creditado antes (externalRef)" });
+  }
+
+  await grantPurchaseCredits({ userId: user.id, credits: 100000, externalRef });
+
+  return NextResponse.json({ ok: true, message: "Créditos adicionados: 100000" });
+}

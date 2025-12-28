@@ -1,0 +1,23 @@
+import Link from "next/link";
+
+export default function Home() {
+  return (
+    <main style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ maxWidth: 760, width: "100%", textAlign: "center" }}>
+        <h1 style={{ fontSize: 48, fontWeight: 900, margin: 0 }}>Nexly</h1>
+        <p style={{ fontSize: 18, color: "#555", marginBottom: 26 }}>
+          Crie sites e SaaS (apps web) com IA. Login Google, projetos salvos, créditos e pagamento.
+        </p>
+
+        <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+          <Link href="/api/auth/signin" style={{ background: "#000", color: "#fff", padding: "12px 18px", borderRadius: 12, textDecoration: "none", fontWeight: 900 }}>
+            Entrar com Google
+          </Link>
+          <Link href="/dashboard" style={{ border: "1px solid #ddd", padding: "12px 18px", borderRadius: 12, textDecoration: "none", color: "#000", fontWeight: 900 }}>
+            Dashboard
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}

@@ -1,0 +1,35 @@
+import { prisma } from "@/lib/prisma";
+
+export async function getIsPro(userId: string) {
+  const paid = await prisma.payment.findFirst({
+    where: { userId, status: "PAID" },
+    select: { id: true },
+  });
+  return !!paid;
+}
+
+export async function debitCredits(params: { userId: string; amount: number; projectId?: string }) {
+  const { userId, amount, projectId } = params;
+  if (amount <= 0) return;
+
+  const wallet = await prisma.creditWallet.findUnique({ where: { userId } });
+  if (!wallet) throw new Error("WALLET_NOT_FOUND");
+  if (wallet.balance < amount) throw new Error("INSUFFICIENT_CREDITS");
+
+  await prisma.$transaction([
+    prisma.creditTransaction.create({ data: { userId, type: "USAGE", amount: -amount, projectId } }),
+    prisma.creditWallet.update({ where: { userId }, data: { balance: { decrement: amount } } }),
+  ]);
+}
+
+export async function grantPurchaseCredits(params: { userId: string; credits: number; externalRef?: string }) {
+  const { userId, credits, externalRef } = params;
+
+  await prisma.$transaction([
+    prisma.payment.create({
+      data: { userId, status: "PAID", creditsGranted: credits, externalRef, provider: "SUNIZE" },
+    }),
+    prisma.creditTransaction.create({ data: { userId, type: "PURCHASE", amount: credits } }),
+    prisma.creditWallet.update({ where: { userId }, data: { balance: { increment: credits } } }),
+  ]);
+}

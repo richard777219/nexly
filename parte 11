@@ -1,0 +1,53 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { prisma } from "@/lib/prisma";
+import { debitCredits } from "@/lib/credits";
+
+function fakeAgentReply(userPrompt: string) {
+  return `✅ Entendi. Vou estruturar seu projeto baseado nisso:
+
+"${userPrompt}"
+
+Próximos passos:
+1) Telas principais
+2) Fluxo do app
+3) Banco de dados
+4) Login Google
+5) Deploy
+
+Me diga: você quer "Site" ou "SaaS"?`;
+}
+
+export async function POST(req: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession();
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+
+  const user = await prisma.user.findUnique({ where: { email }, include: { wallet: true } });
+  if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+
+  const project = await prisma.project.findFirst({ where: { id: params.id, userId: user.id }, select: { id: true } });
+  if (!project) return NextResponse.json({ error: "PROJECT_NOT_FOUND" }, { status: 404 });
+
+  const body = await req.json();
+  const content = String(body?.content ?? "").trim();
+  if (!content) return NextResponse.json({ error: "EMPTY_MESSAGE" }, { status: 400 });
+
+  const COST = 100;
+
+  try {
+    await debitCredits({ userId: user.id, amount: COST, projectId: project.id });
+  } catch {
+    return NextResponse.json({ error: "INSUFFICIENT_CREDITS" }, { status: 402 });
+  }
+
+  const agentReply = fakeAgentReply(content);
+
+  await prisma.$transaction([
+    prisma.projectMessage.create({ data: { projectId: project.id, role: "user", content, creditsUsed: COST } }),
+    prisma.projectMessage.create({ data: { projectId: project.id, role: "agent", content: agentReply, creditsUsed: 0 } }),
+    prisma.project.update({ where: { id: project.id }, data: { status: "READY" } })
+  ]);
+
+  return NextResponse.json({ ok: true });
+}

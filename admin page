@@ -1,0 +1,77 @@
+"use client";
+import { useEffect, useState } from "react";
+
+export default function AdminPage() {
+  const [email, setEmail] = useState("");
+  const [externalRef, setExternalRef] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  async function checkAccess() {
+    const meRes = await fetch("/api/me");
+    if (meRes.status === 401) { window.location.href = "/api/auth/signin"; return; }
+    const me = await meRes.json();
+
+    const adminEmail = String(me?.adminEmail ?? "").toLowerCase();
+    const current = String(me?.user?.email ?? "").toLowerCase();
+
+    if (!adminEmail || current !== adminEmail) {
+      alert("Acesso negado.");
+      window.location.href = "/dashboard";
+      return;
+    }
+    setChecking(false);
+  }
+
+  useEffect(() => { checkAccess(); }, []);
+
+  async function approve() {
+    setLoading(true);
+    setMsg(null);
+
+    const res = await fetch("/api/admin/grant-credits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, externalRef: externalRef.trim() || undefined }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMsg(`Erro: ${data?.error ?? "Falha"}`);
+      setLoading(false);
+      return;
+    }
+
+    setMsg(data?.message ?? "OK");
+    setLoading(false);
+  }
+
+  if (checking) return <div style={{ padding: 24 }}>Verificando acesso…</div>;
+
+  return (
+    <main style={{ minHeight: "100vh", padding: 24, maxWidth: 720, margin: "0 auto" }}>
+      <h1 style={{ fontSize: 28, fontWeight: 900, marginBottom: 10 }}>Admin (secreto)</h1>
+      <p style={{ color: "#666", marginBottom: 18 }}>Após confirmar na Sunize, credite 100.000 no usuário.</p>
+
+      <div style={{ display: "grid", gap: 10 }}>
+        <input style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}
+          placeholder="Email do comprador"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <input style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}
+          placeholder="externalRef (opcional) - id do pedido Sunize"
+          value={externalRef}
+          onChange={(e) => setExternalRef(e.target.value)}
+        />
+        <button onClick={approve} disabled={loading}
+          style={{ background: "#000", color: "#fff", padding: "12px 14px", borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 900 }}>
+          {loading ? "Aprovando..." : "Aprovar e creditar 100.000"}
+        </button>
+
+        {msg && <div style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>{msg}</div>}
+      </div>
+    </main>
+  );
+}

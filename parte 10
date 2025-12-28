@@ -1,0 +1,20 @@
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { prisma } from "@/lib/prisma";
+
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession();
+  const email = session?.user?.email;
+  if (!email) return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return NextResponse.json({ error: "USER_NOT_FOUND" }, { status: 404 });
+
+  const project = await prisma.project.findFirst({
+    where: { id: params.id, userId: user.id },
+    include: { messages: { orderBy: { createdAt: "asc" } } },
+  });
+
+  if (!project) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  return NextResponse.json({ project });
+}

@@ -1,0 +1,25 @@
+nexly/
+  package.json
+  next.config.js
+  tsconfig.json
+  postcss.config.js
+  tailwind.config.ts
+  prisma/
+    schema.prisma
+  src/
+    app/
+      layout.tsx
+      page.tsx
+      dashboard/page.tsx
+      projects/[id]/page.tsx
+      admin/page.tsx
+      api/
+        auth/[...nextauth]/route.ts
+        me/route.ts
+        projects/route.ts
+        projects/[id]/route.ts
+        projects/[id]/messages/route.ts
+        admin/grant-credits/route.ts
+    lib/
+      prisma.ts
+      credits.ts
